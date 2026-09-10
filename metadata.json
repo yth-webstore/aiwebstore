@@ -1,0 +1,6 @@
+{
+  "name": "Rekap Tilawah & Sholawat",
+  "description": "Aplikasi formulir dan dashboard rekap tilawah & sholawat dengan sinkronisasi Google Sheets real-time dan visualisasi data intuitif.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
