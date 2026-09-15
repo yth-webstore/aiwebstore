@@ -11,8 +11,8 @@ import type { User } from 'firebase/auth';
 import { FORM_VIEW_URL } from '../data/quranData';
 
 interface NavbarProps {
-  activeTab: 'form' | 'stats' | 'table' | 'leaderboard';
-  setActiveTab: (tab: 'form' | 'stats' | 'table' | 'leaderboard') => void;
+  activeTab: 'form' | 'stats' | 'leaderboard';
+  setActiveTab: (tab: 'form' | 'stats' | 'leaderboard') => void;
   user: User | null;
   isLoggingIn: boolean;
   onLogin: () => void;
@@ -161,30 +161,6 @@ export const Navbar: React.FC<NavbarProps> = ({
             Formulir Setoran
           </button>
           <button
-            id="tab-btn-stats"
-            type="button"
-            onClick={() => setActiveTab('stats')}
-            className={`px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold whitespace-nowrap transition-all ${
-              activeTab === 'stats'
-                ? 'bg-emerald-600 text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-            }`}
-          >
-            Dashboard &amp; Statistik
-          </button>
-          <button
-            id="tab-btn-table"
-            type="button"
-            onClick={() => setActiveTab('table')}
-            className={`px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold whitespace-nowrap transition-all ${
-              activeTab === 'table'
-                ? 'bg-emerald-600 text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-            }`}
-          >
-            Rekap Data ({totalRecords})
-          </button>
-          <button
             id="tab-btn-leaderboard"
             type="button"
             onClick={() => setActiveTab('leaderboard')}
@@ -195,6 +171,27 @@ export const Navbar: React.FC<NavbarProps> = ({
             }`}
           >
             Peringkat &amp; Leaderboard
+          </button>
+          <button
+            id="tab-btn-stats"
+            type="button"
+            onClick={() => setActiveTab('stats')}
+            className={`px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 ${
+              activeTab === 'stats'
+                ? 'bg-emerald-600 text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
+          >
+            <span>Statistik &amp; Rekap Data</span>
+            <span
+              className={`px-1.5 py-0.5 rounded-md text-[11px] font-bold ${
+                activeTab === 'stats'
+                  ? 'bg-white/20 text-white'
+                  : 'bg-slate-200 text-slate-700'
+              }`}
+            >
+              {totalRecords}
+            </span>
           </button>
         </nav>
       </div>

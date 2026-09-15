@@ -103,9 +103,12 @@ export const SubmissionForm: React.FC<SubmissionFormProps> = ({
       setErrorMsg('Silakan pilih Surat Al-Qur\'an.');
       return;
     }
-    if (isCustomSholawat && (customSholawat.trim() === '' || isNaN(Number(customSholawat)))) {
-      setErrorMsg('Silakan masukkan jumlah sholawat yang valid.');
-      return;
+    if (isCustomSholawat) {
+      const parsed = parseInt(customSholawat.trim(), 10);
+      if (isNaN(parsed) || parsed < 0) {
+        setErrorMsg('Silakan masukkan angka jumlah sholawat yang valid (0 atau lebih).');
+        return;
+      }
     }
 
     setShowConfirmModal(true);
@@ -129,6 +132,9 @@ export const SubmissionForm: React.FC<SubmissionFormProps> = ({
       // Reset partial fields but keep member if desired
       setAyat('0');
       setCatatanKecil('');
+      setCustomSholawat('');
+      setIsCustomSholawat(false);
+      setSholawat(100);
     } catch (err: any) {
       setErrorMsg(err.message || 'Gagal mengirim data. Silakan coba lagi.');
       setShowConfirmModal(false);
@@ -415,26 +421,80 @@ export const SubmissionForm: React.FC<SubmissionFormProps> = ({
                 <span>5. Kirim Sholawat</span>
                 <span className="text-rose-500">*</span>
               </label>
+              <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-md border border-emerald-200">
+                {effectiveSholawat.toLocaleString('id-ID')} kali
+              </span>
+            </div>
+            <p className="text-xs text-slate-500">
+              Sudah berapa kali kirim sholawat pada hari ini? Pilih jumlah standar atau klik &quot;Input Jumlah Lain&quot;.
+            </p>
+
+            {/* Grid of standard presets + custom toggle */}
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+              {SHOLAWAT_PRESETS.map((preset) => {
+                const isSelected = !isCustomSholawat && sholawat === preset;
+                return (
+                  <button
+                    key={preset}
+                    id={`btn-sholawat-${preset}`}
+                    type="button"
+                    onClick={() => {
+                      setIsCustomSholawat(false);
+                      setSholawat(preset);
+                    }}
+                    className={`py-2.5 px-3 rounded-xl border text-center font-bold text-base transition-all cursor-pointer ${
+                      isSelected
+                        ? 'border-amber-500 bg-amber-50 text-amber-900 shadow-xs ring-2 ring-amber-400'
+                        : 'border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700'
+                    }`}
+                  >
+                    <span>{preset.toLocaleString('id-ID')}</span>
+                    <span className="block text-[11px] font-normal text-slate-500 mt-0.5">
+                      kali
+                    </span>
+                  </button>
+                );
+              })}
+
+              {/* 5th button: Input Jumlah Lain */}
               <button
                 id="btn-toggle-custom-sholawat"
                 type="button"
                 onClick={() => {
-                  if (!isCustomSholawat && !customSholawat) {
+                  setIsCustomSholawat(true);
+                  if (!customSholawat) {
                     setCustomSholawat(sholawat > 0 ? sholawat.toString() : '100');
                   }
-                  setIsCustomSholawat(!isCustomSholawat);
                 }}
-                className="text-xs font-semibold text-emerald-700 hover:text-emerald-800 cursor-pointer"
+                className={`py-2.5 px-3 rounded-xl border text-center font-bold text-sm transition-all cursor-pointer flex flex-col items-center justify-center ${
+                  isCustomSholawat
+                    ? 'border-emerald-600 bg-emerald-50 text-emerald-900 shadow-xs ring-2 ring-emerald-500'
+                    : 'border-dashed border-slate-300 bg-white hover:bg-slate-50 text-slate-600'
+                }`}
               >
-                {isCustomSholawat ? 'Pilih Jumlah Standar' : 'Input Jumlah Lain'}
+                <span>Input Jumlah Lain</span>
+                <span className="text-[10px] font-normal text-slate-500 mt-0.5">
+                  {isCustomSholawat && customSholawat ? `${customSholawat} kali` : 'Ketik angka'}
+                </span>
               </button>
             </div>
-            <p className="text-xs text-slate-500">
-              Sudah berapa kali kirim sholawat pada hari ini?
-            </p>
 
-            {isCustomSholawat ? (
-              <div className="space-y-2">
+            {/* Custom sholawat input card when custom is selected */}
+            {isCustomSholawat && (
+              <div className="p-3.5 bg-emerald-50/60 border border-emerald-200 rounded-xl space-y-2.5 animate-in fade-in slide-in-from-top-1">
+                <div className="flex items-center justify-between">
+                  <label htmlFor="input-custom-sholawat" className="text-xs font-bold text-emerald-950">
+                    Masukkan Jumlah Sholawat (Bebas / Lainnya):
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setIsCustomSholawat(false)}
+                    className="text-[11px] text-emerald-700 hover:text-emerald-900 underline font-medium cursor-pointer"
+                  >
+                    Kembali ke Pilihan Standar
+                  </button>
+                </div>
+
                 <div className="flex items-center gap-2">
                   <input
                     id="input-custom-sholawat"
@@ -443,72 +503,40 @@ export const SubmissionForm: React.FC<SubmissionFormProps> = ({
                     step="1"
                     value={customSholawat}
                     onChange={(e) => setCustomSholawat(e.target.value)}
-                    placeholder="Masukkan jumlah kali sholawat..."
-                    className="w-full px-4 py-2.5 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:bg-white focus:outline-hidden"
+                    placeholder="Contoh: 25, 33, 70, 300, 1500..."
+                    className="w-full px-4 py-2.5 text-sm bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-hidden font-semibold text-slate-900"
+                    autoFocus
                   />
-                  <span className="text-xs font-semibold text-slate-600 shrink-0">kali</span>
+                  <span className="text-xs font-bold text-slate-700 shrink-0">kali</span>
                 </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {[25, 50, 75, 150, 200, 500, 1000].map((val) => (
-                    <button
-                      key={val}
-                      type="button"
-                      onClick={() => setCustomSholawat(val.toString())}
-                      className="text-[10px] px-2 py-0.5 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium transition-colors cursor-pointer"
-                    >
-                      {val} kali
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {SHOLAWAT_PRESETS.map((preset) => {
-                  const isSelected = sholawat === preset;
-                  return (
-                    <button
-                      key={preset}
-                      id={`btn-sholawat-${preset}`}
-                      type="button"
-                      onClick={() => setSholawat(preset)}
-                      className={`py-3 px-4 rounded-xl border text-center font-bold text-lg transition-all cursor-pointer ${
-                        isSelected
-                          ? 'border-amber-500 bg-amber-50 text-amber-900 shadow-xs ring-1 ring-amber-400'
-                          : 'border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700'
-                      }`}
-                    >
-                      <span>{preset.toLocaleString('id-ID')}</span>
-                      <span className="block text-[11px] font-normal text-slate-500 mt-0.5">
-                        kali
-                      </span>
-                    </button>
-                  );
-                })}
               </div>
             )}
           </div>
 
           {/* Section 5: Catatan Kecil / Do'a */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <label className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
-                <span>6. Catatan Kecil / Do'a Singkat</span>
-                <span className="text-xs font-normal text-slate-500">(Opsional)</span>
-              </label>
+          <div className="space-y-2.5">
+            <label className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+              <span>6. Catatan Kecil / Do'a Singkat</span>
+              <span className="text-xs font-normal text-slate-500">(Opsional)</span>
+            </label>
+
+            {/* Pilihan random posisi tepat di bawah judul */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-0.5">
+              <p className="text-xs text-slate-500">
+                Boleh sisipkan kritik, saran, nasihat, atau do&apos;a singkat ❤️
+              </p>
               <button
                 id="btn-random-catatan"
                 type="button"
                 onClick={handleRandomCatatan}
-                className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg transition-all cursor-pointer active:scale-95"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-emerald-800 bg-emerald-100 hover:bg-emerald-200 border border-emerald-300 rounded-lg transition-all cursor-pointer active:scale-95 shadow-xs shrink-0 self-start sm:self-auto"
                 title="Pilih do'a / catatan secara acak"
               >
-                <Shuffle className="w-3.5 h-3.5" />
-                <span>Pilih Random</span>
+                <Shuffle className="w-3.5 h-3.5 text-emerald-700" />
+                <span>Pilihan Random</span>
               </button>
             </div>
-            <p className="text-xs text-slate-500">
-              Boleh sisipkan kritik, saran, juga nasihat atau do'a singkat ❤️ (klik tombol "Pilih Random" atau pilih dari daftar di bawah)
-            </p>
+
             <textarea
               id="textarea-catatan"
               rows={3}

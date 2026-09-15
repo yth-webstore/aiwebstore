@@ -25,7 +25,7 @@ import {
 } from 'lucide-react';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'form' | 'stats' | 'table' | 'leaderboard'>('form');
+  const [activeTab, setActiveTab] = useState<'form' | 'stats' | 'leaderboard'>('form');
   const [user, setUser] = useState<User | null>(null);
   const [hasGoogleToken, setHasGoogleToken] = useState<boolean>(false);
   const [isLoggingIn, setIsLoggingIn] = useState<boolean>(false);
@@ -150,7 +150,7 @@ export default function App() {
 
   const handleSelectMember = (name: string) => {
     setSelectedMemberFilter(name);
-    setActiveTab('table');
+    setActiveTab('stats');
   };
 
   return (
@@ -183,31 +183,33 @@ export default function App() {
           </div>
         )}
 
-        {/* Tab 2: Dashboard & Statistik */}
+        {/* Tab 2: Dashboard Statistik & Rekap Data Disatukan */}
         {activeTab === 'stats' && (
-          <div className="space-y-6">
+          <div className="space-y-8">
+            {/* Metrik Statistik */}
             <DashboardStats metrics={metrics} />
+
+            {/* Visualisasi Grafik Analitik */}
             <AnalyticsCharts metrics={metrics} />
+
+            {/* Tabel Rekap Data Lengkap */}
+            <div className="pt-2">
+              <LiveDataTable
+                rows={rows}
+                isLoading={isLoadingData}
+                selectedMember={selectedMemberFilter}
+                onClearMemberFilter={() => setSelectedMemberFilter(undefined)}
+              />
+            </div>
           </div>
         )}
 
-        {/* Tab 3: Tabel Rekap Data */}
-        {activeTab === 'table' && (
-          <div className="space-y-6">
-            <LiveDataTable
-              rows={rows}
-              isLoading={isLoadingData}
-              selectedMember={selectedMemberFilter}
-              onClearMemberFilter={() => setSelectedMemberFilter(undefined)}
-            />
-          </div>
-        )}
-
-        {/* Tab 4: Leaderboard Penuh */}
+        {/* Tab 3: Leaderboard Penuh */}
         {activeTab === 'leaderboard' && (
           <div className="space-y-6">
             <MemberLeaderboard
               metrics={metrics}
+              rows={rows}
               onSelectMember={handleSelectMember}
             />
           </div>

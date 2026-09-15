@@ -137,7 +137,15 @@ export async function submitLaporan(
     formData.append(FORM_ENTRY_IDS.kegiatan, data.kegiatan);
     formData.append(FORM_ENTRY_IDS.surat, data.surat);
     formData.append(FORM_ENTRY_IDS.ayat, data.ayat);
-    formData.append(FORM_ENTRY_IDS.sholawat, String(data.sholawat));
+    const standardPresets = ['50', '100', '500', '1000'];
+    const sholawatStr = String(data.sholawat);
+    if (standardPresets.includes(sholawatStr)) {
+      formData.append(FORM_ENTRY_IDS.sholawat, sholawatStr);
+    } else {
+      // Google Forms radio button with "Other:" field requires __other_option__ and other_option_response
+      formData.append(FORM_ENTRY_IDS.sholawat, '__other_option__');
+      formData.append(`${FORM_ENTRY_IDS.sholawat}.other_option_response`, sholawatStr);
+    }
     formData.append(FORM_ENTRY_IDS.catatanKecil, data.catatanKecil || '');
 
     // Submit with mode: 'no-cors' so browser executes POST to Google Forms
