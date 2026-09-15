@@ -11,6 +11,7 @@ import {
   ArrowRight,
   History,
   Send,
+  Shuffle,
 } from 'lucide-react';
 import {
   DEFAULT_MEMBERS,
@@ -42,7 +43,7 @@ export const SubmissionForm: React.FC<SubmissionFormProps> = ({
   const [kegiatan, setKegiatan] = useState<'Tilawah' | "Mustami'" | 'Terjemah'>('Tilawah');
   const [surat, setSurat] = useState<string>('1 Al-Fatihah');
   const [searchSurahQuery, setSearchSurahQuery] = useState<string>('');
-  const [ayat, setAyat] = useState<string>('1-10');
+  const [ayat, setAyat] = useState<string>('0');
 
   const [sholawat, setSholawat] = useState<number>(100);
   const [customSholawat, setCustomSholawat] = useState<string>('');
@@ -65,8 +66,30 @@ export const SubmissionForm: React.FC<SubmissionFormProps> = ({
 
   const effectiveNama = isCustomNama ? customNama.trim() : nama;
   const effectiveSholawat = isCustomSholawat
-    ? Number(customSholawat) || 0
+    ? Math.max(0, parseInt(customSholawat, 10) || 0)
     : sholawat;
+
+  const quickAyatPresets = ['0', '1 - 10', '1 - 20', '1 - 50', 'Halaman 1', 'Khatam'];
+
+  const quickDoaPresets = [
+    'Semoga istiqomah, berkah, & diridhoi Allah 🤲',
+    'Alhamdulillah tuntas target bacaan hari ini 📖✨',
+    'Ya Allah jadikan Al-Qur\'an penyejuk hati & penerang jalan kehidupan 🤲',
+    'Mohon doa restu untuk kelancaran hajat, rezeki barokah & kesehatan sekeluarga',
+    'Semoga Allah limpahkan ketenangan batin, kemudahan urusan, dan ampunan dosa',
+    'Alhamdulillah nikmat tilawah dan bersholawat bersama komunitas tercinta 💚',
+    'Semoga syafaat Baginda Nabi Muhammad ﷺ senantiasa menyertai kita semua',
+    'Doa tulus untuk saudara-saudari kita yang sedang diuji sakit maupun kesulitan 🤲',
+    'Bismillah senantiasa didekatkan dengan Al-Qur\'an dan sholawat setiap waktu 🌿',
+    'Alhamdulillah bertambah sejuk dan damai setelah menyapa ayat-ayat suci-Nya',
+    'Semoga Allah kumpulkan kita bersama para ahlul Qur\'an di surga-Nya kelak 🤲',
+    'Ya Rabb, bimbing kami agar selalu bersyukur dan giat beramal saleh ✨',
+  ];
+
+  const handleRandomCatatan = () => {
+    const randomIndex = Math.floor(Math.random() * quickDoaPresets.length);
+    setCatatanKecil(quickDoaPresets[randomIndex]);
+  };
 
   const handleOpenConfirm = (e: React.FormEvent) => {
     e.preventDefault();
@@ -78,6 +101,10 @@ export const SubmissionForm: React.FC<SubmissionFormProps> = ({
     }
     if (!surat && kegiatan === 'Tilawah') {
       setErrorMsg('Silakan pilih Surat Al-Qur\'an.');
+      return;
+    }
+    if (isCustomSholawat && (customSholawat.trim() === '' || isNaN(Number(customSholawat)))) {
+      setErrorMsg('Silakan masukkan jumlah sholawat yang valid.');
       return;
     }
 
@@ -100,22 +127,13 @@ export const SubmissionForm: React.FC<SubmissionFormProps> = ({
       setTimeout(() => setSuccessToast(false), 5000);
 
       // Reset partial fields but keep member if desired
-      setAyat('');
+      setAyat('0');
       setCatatanKecil('');
     } catch (err: any) {
       setErrorMsg(err.message || 'Gagal mengirim data. Silakan coba lagi.');
       setShowConfirmModal(false);
     }
   };
-
-  const quickAyatPresets = ['1 - 10', '1 - 20', '1 - 50', 'Halaman 1', 'Khatam'];
-
-  const quickDoaPresets = [
-    'Semoga istiqomah & berkah ❤️',
-    'Alhamdulillah lancar hari ini 🤲',
-    'Mohon doanya untuk kemudahan urusan keluarga',
-    'Bismillah siap melanjutkan esok hari',
-  ];
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -362,14 +380,14 @@ export const SubmissionForm: React.FC<SubmissionFormProps> = ({
                 <span>4. Nomor Ayat</span>
               </label>
               <p className="text-[11px] text-slate-500">
-                Nomor ayat terakhir yang dibaca (cth: 1-10, 25, 141)
+                Nomor ayat terakhir yang dibaca (cth: 0, 1-10, 25, 141)
               </p>
               <input
                 id="input-ayat"
                 type="text"
                 value={ayat}
                 onChange={(e) => setAyat(e.target.value)}
-                placeholder="Contoh: 1-20 atau 15"
+                placeholder="0"
                 className="w-full px-4 py-2 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:bg-white focus:outline-hidden transition-all"
               />
 
@@ -400,10 +418,15 @@ export const SubmissionForm: React.FC<SubmissionFormProps> = ({
               <button
                 id="btn-toggle-custom-sholawat"
                 type="button"
-                onClick={() => setIsCustomSholawat(!isCustomSholawat)}
-                className="text-xs font-semibold text-emerald-700 hover:text-emerald-800"
+                onClick={() => {
+                  if (!isCustomSholawat && !customSholawat) {
+                    setCustomSholawat(sholawat > 0 ? sholawat.toString() : '100');
+                  }
+                  setIsCustomSholawat(!isCustomSholawat);
+                }}
+                className="text-xs font-semibold text-emerald-700 hover:text-emerald-800 cursor-pointer"
               >
-                {isCustomSholawat ? 'Pilih Jumlah Standar' : 'Input Angka Lain'}
+                {isCustomSholawat ? 'Pilih Jumlah Standar' : 'Input Jumlah Lain'}
               </button>
             </div>
             <p className="text-xs text-slate-500">
@@ -411,18 +434,32 @@ export const SubmissionForm: React.FC<SubmissionFormProps> = ({
             </p>
 
             {isCustomSholawat ? (
-              <div className="flex items-center gap-2">
-                <input
-                  id="input-custom-sholawat"
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={customSholawat}
-                  onChange={(e) => setCustomSholawat(e.target.value)}
-                  placeholder="Masukkan jumlah kali sholawat..."
-                  className="w-full px-4 py-2.5 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:bg-white focus:outline-hidden"
-                />
-                <span className="text-xs font-semibold text-slate-600 shrink-0">kali</span>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <input
+                    id="input-custom-sholawat"
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={customSholawat}
+                    onChange={(e) => setCustomSholawat(e.target.value)}
+                    placeholder="Masukkan jumlah kali sholawat..."
+                    className="w-full px-4 py-2.5 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:bg-white focus:outline-hidden"
+                  />
+                  <span className="text-xs font-semibold text-slate-600 shrink-0">kali</span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {[25, 50, 75, 150, 200, 500, 1000].map((val) => (
+                    <button
+                      key={val}
+                      type="button"
+                      onClick={() => setCustomSholawat(val.toString())}
+                      className="text-[10px] px-2 py-0.5 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium transition-colors cursor-pointer"
+                    >
+                      {val} kali
+                    </button>
+                  ))}
+                </div>
               </div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -434,7 +471,7 @@ export const SubmissionForm: React.FC<SubmissionFormProps> = ({
                       id={`btn-sholawat-${preset}`}
                       type="button"
                       onClick={() => setSholawat(preset)}
-                      className={`py-3 px-4 rounded-xl border text-center font-bold text-lg transition-all ${
+                      className={`py-3 px-4 rounded-xl border text-center font-bold text-lg transition-all cursor-pointer ${
                         isSelected
                           ? 'border-amber-500 bg-amber-50 text-amber-900 shadow-xs ring-1 ring-amber-400'
                           : 'border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700'
@@ -453,12 +490,24 @@ export const SubmissionForm: React.FC<SubmissionFormProps> = ({
 
           {/* Section 5: Catatan Kecil / Do'a */}
           <div className="space-y-2">
-            <label className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
-              <span>6. Catatan Kecil / Do'a Singkat</span>
-              <span className="text-xs font-normal text-slate-500">(Opsional)</span>
-            </label>
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+                <span>6. Catatan Kecil / Do'a Singkat</span>
+                <span className="text-xs font-normal text-slate-500">(Opsional)</span>
+              </label>
+              <button
+                id="btn-random-catatan"
+                type="button"
+                onClick={handleRandomCatatan}
+                className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg transition-all cursor-pointer active:scale-95"
+                title="Pilih do'a / catatan secara acak"
+              >
+                <Shuffle className="w-3.5 h-3.5" />
+                <span>Pilih Random</span>
+              </button>
+            </div>
             <p className="text-xs text-slate-500">
-              Boleh sisipkan kritik, saran, juga nasihat atau do'a singkat ❤️
+              Boleh sisipkan kritik, saran, juga nasihat atau do'a singkat ❤️ (klik tombol "Pilih Random" atau pilih dari daftar di bawah)
             </p>
             <textarea
               id="textarea-catatan"
@@ -470,13 +519,17 @@ export const SubmissionForm: React.FC<SubmissionFormProps> = ({
             />
 
             {/* Quick Doa chips */}
-            <div className="flex flex-wrap gap-1.5 pt-1">
+            <div className="flex flex-wrap gap-1.5 pt-1 max-h-36 overflow-y-auto pr-1 scrollbar-thin">
               {quickDoaPresets.map((preset) => (
                 <button
                   key={preset}
                   type="button"
                   onClick={() => setCatatanKecil(preset)}
-                  className="text-[11px] px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-100 transition-colors"
+                  className={`text-[11px] px-2.5 py-1 rounded-lg border text-left transition-colors cursor-pointer ${
+                    catatanKecil === preset
+                      ? 'bg-emerald-600 text-white border-emerald-600 font-medium shadow-xs'
+                      : 'bg-emerald-50/70 text-emerald-800 hover:bg-emerald-100 border-emerald-100'
+                  }`}
                 >
                   {preset}
                 </button>
