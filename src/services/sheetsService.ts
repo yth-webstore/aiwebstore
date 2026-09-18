@@ -3,7 +3,9 @@ import {
   FORM_RESPONSE_URL,
   FORM_ENTRY_IDS,
 } from '../data/quranData';
-import type { SubmissionData, SheetRow, DashboardMetrics } from '../types';
+import { TOTAL_QURAN_VERSES } from '../data/quranSurahData';
+import { calculateMemberVerseProgress } from '../utils/quranVerseCalculator';
+import type { SubmissionData, SheetRow, DashboardMetrics, MemberContribution } from '../types';
 import { getAccessToken } from './auth';
 
 /**
@@ -183,13 +185,9 @@ export function computeDashboardMetrics(rows: SheetRow[]): DashboardMetrics {
     "Mustami'": 0,
     Terjemah: 0,
   };
-  const memberMap: Record<
-    string,
-    { name: string; tilawahCount: number; totalSholawat: number; lastActive: string; lastDate: Date }
-  > = {};
+  const memberRowsMap: Record<string, SheetRow[]> = {};
 
   const today = new Date();
-  const todayStr = `${today.getFullYear()}-${today.getMonth() + 1}-${today.getDate()}`;
   let todaySubmissions = 0;
 
   // Daily trend mapping for last 14 days
@@ -222,23 +220,12 @@ export function computeDashboardMetrics(rows: SheetRow[]): DashboardMetrics {
       todaySubmissions++;
     }
 
-    // Member Map
+    // Collect rows per member for verse delta calculation
     const memberName = r.nama || 'Anonim';
-    if (!memberMap[memberName]) {
-      memberMap[memberName] = {
-        name: memberName,
-        tilawahCount: 0,
-        totalSholawat: 0,
-        lastActive: r.timestamp,
-        lastDate: rDate,
-      };
+    if (!memberRowsMap[memberName]) {
+      memberRowsMap[memberName] = [];
     }
-    memberMap[memberName].tilawahCount++;
-    memberMap[memberName].totalSholawat += r.sholawat;
-    if (rDate > memberMap[memberName].lastDate) {
-      memberMap[memberName].lastDate = rDate;
-      memberMap[memberName].lastActive = r.timestamp;
-    }
+    memberRowsMap[memberName].push(r);
 
     // Daily key: YYYY-MM-DD
     const dateKey = `${rDate.getFullYear()}-${String(rDate.getMonth() + 1).padStart(2, '0')}-${String(rDate.getDate()).padStart(2, '0')}`;
@@ -263,15 +250,34 @@ export function computeDashboardMetrics(rows: SheetRow[]): DashboardMetrics {
     .sort((a, b) => b.count - a.count)
     .slice(0, 10);
 
-  // Member contributions
-  const memberContributions = Object.values(memberMap)
-    .sort((a, b) => b.tilawahCount - a.tilawahCount || b.totalSholawat - a.totalSholawat)
-    .map(({ name, tilawahCount, totalSholawat, lastActive }) => ({
-      name,
-      tilawahCount,
-      totalSholawat,
-      lastActive,
-    }));
+  // Calculate verse progress per member & sort by total verses read!
+  let totalVersesRead = 0;
+  const memberContributions: MemberContribution[] = Object.entries(memberRowsMap)
+    .map(([name, mRows]) => {
+      const prog = calculateMemberVerseProgress(mRows);
+      totalVersesRead += prog.totalVerses;
+      return {
+        name,
+        totalVerses: prog.totalVerses,
+        estimatedJuz: prog.estimatedJuz,
+        estimatedPages: prog.estimatedPages,
+        lastPosition: prog.lastPosition,
+        tilawahCount: prog.totalSubmissions,
+        totalSholawat: prog.totalSholawat,
+        lastActive: prog.lastActive,
+      };
+    })
+    .sort(
+      (a, b) =>
+        b.totalVerses - a.totalVerses ||
+        b.tilawahCount - a.tilawahCount ||
+        b.totalSholawat - a.totalSholawat
+    );
+
+  const estimatedTotalJuz = Math.min(
+    30,
+    Number((totalVersesRead / (TOTAL_QURAN_VERSES / 30)).toFixed(1))
+  );
 
   // Daily trends sorted by date
   const sortedDates = Object.keys(dailyMap).sort();
@@ -293,6 +299,8 @@ export function computeDashboardMetrics(rows: SheetRow[]): DashboardMetrics {
     totalSubmissions,
     totalSholawat,
     totalUniqueMembers: uniqueMembers.size,
+    totalVersesRead,
+    estimatedTotalJuz,
     topSurah,
     todaySubmissions,
     kegiatanCounts,

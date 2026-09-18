@@ -1,6 +1,17 @@
 import React, { useState, useMemo } from 'react';
-import { Trophy, HeartHandshake, BookOpen, Search, Calendar, Globe, Medal } from 'lucide-react';
-import type { DashboardMetrics, SheetRow } from '../types';
+import {
+  Trophy,
+  HeartHandshake,
+  BookOpen,
+  Search,
+  Calendar,
+  Globe,
+  Medal,
+  BookmarkCheck,
+  FileText,
+} from 'lucide-react';
+import type { DashboardMetrics, SheetRow, MemberContribution } from '../types';
+import { calculateMemberVerseProgress } from '../utils/quranVerseCalculator';
 
 interface MemberLeaderboardProps {
   metrics: DashboardMetrics;
@@ -14,7 +25,7 @@ export const MemberLeaderboard: React.FC<MemberLeaderboardProps> = ({
   onSelectMember,
 }) => {
   const [rankScope, setRankScope] = useState<'monthly' | 'global'>('monthly');
-  const [sortBy, setSortBy] = useState<'tilawah' | 'sholawat'>('tilawah');
+  const [sortBy, setSortBy] = useState<'verses' | 'sholawat' | 'reports'>('verses');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
   // Extract all unique months available in data
@@ -57,88 +68,78 @@ export const MemberLeaderboard: React.FC<MemberLeaderboardProps> = ({
     }
   }, [availableMonths, selectedMonth]);
 
-  // Aggregate member contributions based on chosen scope
-  const activeContributions = useMemo(() => {
-    if (rankScope === 'global') {
-      if (!rows || rows.length === 0) {
-        return metrics.memberContributions;
-      }
-      const map: Record<
-        string,
-        { name: string; tilawahCount: number; totalSholawat: number; lastActive: string; lastDate: Date }
-      > = {};
-      rows.forEach((r) => {
-        if (!map[r.nama]) {
-          map[r.nama] = {
-            name: r.nama,
-            tilawahCount: 0,
-            totalSholawat: 0,
-            lastActive: r.timestamp,
-            lastDate: r.rawDate,
-          };
-        }
-        map[r.nama].tilawahCount += 1;
-        map[r.nama].totalSholawat += r.sholawat || 0;
-        if (r.rawDate > map[r.nama].lastDate) {
-          map[r.nama].lastDate = r.rawDate;
-          map[r.nama].lastActive = r.timestamp;
-        }
-      });
-      return Object.values(map);
-    } else {
-      // Monthly scope
-      if (!rows || rows.length === 0) {
-        return metrics.memberContributions;
-      }
-      const map: Record<
-        string,
-        { name: string; tilawahCount: number; totalSholawat: number; lastActive: string; lastDate: Date }
-      > = {};
-
-      rows.forEach((r) => {
-        if (r.rawDate && !isNaN(r.rawDate.getTime())) {
-          const rowYear = r.rawDate.getFullYear();
-          const rowMonth = String(r.rawDate.getMonth() + 1).padStart(2, '0');
-          const rowMonthKey = `${rowYear}-${rowMonth}`;
-
-          if (rowMonthKey === selectedMonth) {
-            if (!map[r.nama]) {
-              map[r.nama] = {
-                name: r.nama,
-                tilawahCount: 0,
-                totalSholawat: 0,
-                lastActive: r.timestamp,
-                lastDate: r.rawDate,
-              };
-            }
-            map[r.nama].tilawahCount += 1;
-            map[r.nama].totalSholawat += r.sholawat || 0;
-            if (r.rawDate > map[r.nama].lastDate) {
-              map[r.nama].lastDate = r.rawDate;
-              map[r.nama].lastActive = r.timestamp;
-            }
-          }
-        }
-      });
-      return Object.values(map);
+  // Aggregate member contributions with verse delta calculation based on chosen scope
+  const activeContributions: MemberContribution[] = useMemo(() => {
+    if (!rows || rows.length === 0) {
+      return metrics.memberContributions || [];
     }
+
+    const scopedRows =
+      rankScope === 'global'
+        ? rows
+        : rows.filter((r) => {
+            if (!r.rawDate || isNaN(r.rawDate.getTime())) return false;
+            const rowYear = r.rawDate.getFullYear();
+            const rowMonth = String(r.rawDate.getMonth() + 1).padStart(2, '0');
+            return `${rowYear}-${rowMonth}` === selectedMonth;
+          });
+
+    const memberRowsMap: Record<string, SheetRow[]> = {};
+    scopedRows.forEach((r) => {
+      const name = r.nama || 'Anonim';
+      if (!memberRowsMap[name]) memberRowsMap[name] = [];
+      memberRowsMap[name].push(r);
+    });
+
+    return Object.entries(memberRowsMap).map(([name, mRows]) => {
+      const prog = calculateMemberVerseProgress(mRows);
+      return {
+        name,
+        totalVerses: prog.totalVerses,
+        estimatedJuz: prog.estimatedJuz,
+        estimatedPages: prog.estimatedPages,
+        lastPosition: prog.lastPosition,
+        tilawahCount: prog.totalSubmissions,
+        totalSholawat: prog.totalSholawat,
+        lastActive: prog.lastActive,
+      };
+    });
   }, [rankScope, selectedMonth, rows, metrics.memberContributions]);
 
   const sortedList = useMemo(() => {
     return [...activeContributions]
-      .sort((a, b) =>
-        sortBy === 'tilawah'
-          ? b.tilawahCount - a.tilawahCount || b.totalSholawat - a.totalSholawat
-          : b.totalSholawat - a.totalSholawat || b.tilawahCount - a.tilawahCount
-      )
+      .sort((a, b) => {
+        if (sortBy === 'verses') {
+          return (
+            b.totalVerses - a.totalVerses ||
+            b.totalSholawat - a.totalSholawat ||
+            b.tilawahCount - a.tilawahCount
+          );
+        } else if (sortBy === 'sholawat') {
+          return (
+            b.totalSholawat - a.totalSholawat ||
+            b.totalVerses - a.totalVerses ||
+            b.tilawahCount - a.tilawahCount
+          );
+        } else {
+          return (
+            b.tilawahCount - a.tilawahCount ||
+            b.totalVerses - a.totalVerses ||
+            b.totalSholawat - a.totalSholawat
+          );
+        }
+      })
       .filter((m) => m.name.toLowerCase().includes(searchQuery.toLowerCase()));
   }, [activeContributions, sortBy, searchQuery]);
 
-  const maxTilawah = Math.max(...activeContributions.map((m) => m.tilawahCount), 1);
+  const maxVerses = Math.max(...activeContributions.map((m) => m.totalVerses), 1);
   const maxSholawat = Math.max(...activeContributions.map((m) => m.totalSholawat), 1);
+  const maxReports = Math.max(...activeContributions.map((m) => m.tilawahCount), 1);
 
   // Totals for the current scope
-  const scopeTotalTilawah = activeContributions.reduce((acc, m) => acc + m.tilawahCount, 0);
+  const scopeTotalVerses = activeContributions.reduce((acc, m) => acc + m.totalVerses, 0);
+  const scopeTotalJuz = Number((scopeTotalVerses / (6236 / 30)).toFixed(1));
+  const scopeTotalReports = activeContributions.reduce((acc, m) => acc + m.tilawahCount, 0);
   const scopeTotalSholawat = activeContributions.reduce((acc, m) => acc + m.totalSholawat, 0);
 
   const selectedMonthLabel =
@@ -148,46 +149,64 @@ export const MemberLeaderboard: React.FC<MemberLeaderboardProps> = ({
     <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
       {/* Header */}
       <div className="p-6 border-b border-slate-200 bg-gradient-to-r from-slate-900 via-slate-800 to-emerald-950 text-white space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
               <Trophy className="w-5 h-5 text-amber-400 shrink-0" />
               <h2 className="text-lg sm:text-xl font-bold tracking-tight">
-                Papan Peringkat &amp; Kontribusi Anggota
+                Papan Peringkat Tilawah &amp; Sholawat
               </h2>
             </div>
             <p className="text-xs text-slate-300 mt-1">
-              Apresiasi istiqomah tilawah Al-Qur&apos;an dan pengiriman sholawat
+              Peringkat berdasar pada <strong>jumlah ayat yang dibaca</strong> (selisih progres bacaan 114 surat Al-Qur&apos;an).
             </p>
           </div>
 
           {/* Sort Switcher */}
           <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-300 hidden sm:inline font-medium">Urutkan:</span>
+            <span className="text-xs text-slate-300 hidden sm:inline font-medium">Acuan Urutan:</span>
             <div className="inline-flex p-1 bg-white/10 rounded-xl text-xs font-semibold backdrop-blur-xs">
               <button
                 type="button"
-                id="btn-sort-tilawah"
-                onClick={() => setSortBy('tilawah')}
-                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-                  sortBy === 'tilawah'
-                    ? 'bg-emerald-500 text-white shadow-xs'
+                id="btn-sort-verses"
+                onClick={() => setSortBy('verses')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                  sortBy === 'verses'
+                    ? 'bg-emerald-500 text-white shadow-xs font-bold'
                     : 'text-slate-300 hover:text-white'
                 }`}
+                title="Peringkat berdasarkan total ayat yang dibaca"
               >
-                Setoran Tilawah
+                <BookOpen className="w-3.5 h-3.5" />
+                <span>Jumlah Ayat</span>
               </button>
               <button
                 type="button"
                 id="btn-sort-sholawat"
                 onClick={() => setSortBy('sholawat')}
-                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
                   sortBy === 'sholawat'
-                    ? 'bg-amber-500 text-white shadow-xs'
+                    ? 'bg-amber-500 text-white shadow-xs font-bold'
                     : 'text-slate-300 hover:text-white'
                 }`}
+                title="Peringkat berdasarkan total sholawat"
               >
-                Total Sholawat
+                <HeartHandshake className="w-3.5 h-3.5" />
+                <span>Sholawat</span>
+              </button>
+              <button
+                type="button"
+                id="btn-sort-reports"
+                onClick={() => setSortBy('reports')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                  sortBy === 'reports'
+                    ? 'bg-slate-600 text-white shadow-xs font-bold'
+                    : 'text-slate-300 hover:text-white'
+                }`}
+                title="Peringkat berdasarkan banyaknya laporan"
+              >
+                <FileText className="w-3.5 h-3.5" />
+                <span>Banyak Laporan</span>
               </button>
             </div>
           </div>
@@ -247,23 +266,28 @@ export const MemberLeaderboard: React.FC<MemberLeaderboardProps> = ({
       </div>
 
       {/* Scope summary banner */}
-      <div className="px-6 py-2.5 bg-emerald-50/70 border-b border-emerald-100 flex flex-wrap items-center justify-between gap-2 text-xs text-emerald-900">
+      <div className="px-6 py-3 bg-emerald-50/70 border-b border-emerald-100 flex flex-wrap items-center justify-between gap-3 text-xs text-emerald-900">
         <div className="flex items-center gap-2">
           <Medal className="w-4 h-4 text-emerald-700 shrink-0" />
           <span className="font-semibold">
             {rankScope === 'monthly'
-              ? `Peringkat Bulan: ${selectedMonthLabel}`
-              : 'Peringkat Global (Akumulasi Semua Waktu)'}
+              ? `Peringkat Periode: ${selectedMonthLabel}`
+              : 'Peringkat Global (Akumulasi Progres Seluruh Waktu)'}
           </span>
         </div>
-        <div className="flex items-center gap-4 text-slate-600">
-          <span>
-            Total Tilawah: <strong className="text-emerald-800">{scopeTotalTilawah}</strong> laporan
+        <div className="flex items-center gap-4 text-slate-700 font-medium">
+          <span className="inline-flex items-center gap-1">
+            <BookOpen className="w-3.5 h-3.5 text-emerald-700" />
+            Total Ayat: <strong className="text-emerald-800 font-bold">{scopeTotalVerses.toLocaleString('id-ID')}</strong> ayat (~{scopeTotalJuz} Juz)
+          </span>
+          <span>•</span>
+          <span className="inline-flex items-center gap-1">
+            <HeartHandshake className="w-3.5 h-3.5 text-amber-600" />
+            Total Sholawat: <strong className="text-amber-800 font-bold">{scopeTotalSholawat.toLocaleString('id-ID')}</strong> kali
           </span>
           <span>•</span>
           <span>
-            Total Sholawat:{' '}
-            <strong className="text-amber-700">{scopeTotalSholawat.toLocaleString('id-ID')}</strong> kali
+            Total Laporan: <strong className="text-slate-900 font-bold">{scopeTotalReports}</strong>
           </span>
         </div>
       </div>
@@ -294,7 +318,7 @@ export const MemberLeaderboard: React.FC<MemberLeaderboardProps> = ({
             onClick={() => onSelectMember && onSelectMember(sortedList[1].name)}
             className="order-2 md:order-1 bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex items-center gap-3 cursor-pointer hover:border-slate-300 transition-all"
           >
-            <div className="w-10 h-10 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center font-black text-lg border-2 border-slate-300 shrink-0">
+            <div className="w-11 h-11 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center font-black text-xl border-2 border-slate-300 shrink-0">
               🥈
             </div>
             <div className="flex-1 min-w-0">
@@ -302,10 +326,11 @@ export const MemberLeaderboard: React.FC<MemberLeaderboardProps> = ({
                 {rankScope === 'monthly' ? 'Peringkat 2 Bulan Ini' : 'Peringkat 2 Global'}
               </span>
               <div className="font-bold text-slate-900 text-sm truncate">{sortedList[1].name}</div>
-              <div className="text-xs text-slate-600 mt-0.5 font-medium">
-                {sortBy === 'tilawah'
-                  ? `${sortedList[1].tilawahCount} Laporan`
-                  : `${sortedList[1].totalSholawat.toLocaleString('id-ID')} Sholawat`}
+              <div className="text-xs text-emerald-800 font-bold mt-0.5">
+                {sortedList[1].totalVerses.toLocaleString('id-ID')} Ayat (~{sortedList[1].estimatedJuz} Juz)
+              </div>
+              <div className="text-[11px] text-slate-500 truncate mt-0.5">
+                {sortedList[1].lastPosition !== '-' ? sortedList[1].lastPosition : `${sortedList[1].tilawahCount} Lap.`} • {sortedList[1].totalSholawat.toLocaleString('id-ID')} Sholawat
               </div>
             </div>
           </div>
@@ -325,10 +350,11 @@ export const MemberLeaderboard: React.FC<MemberLeaderboardProps> = ({
               <div className="font-extrabold text-slate-900 text-base truncate">
                 {sortedList[0].name}
               </div>
-              <div className="text-xs font-semibold text-amber-900 mt-0.5">
-                {sortBy === 'tilawah'
-                  ? `${sortedList[0].tilawahCount} Laporan Tilawah`
-                  : `${sortedList[0].totalSholawat.toLocaleString('id-ID')} Sholawat`}
+              <div className="text-xs font-bold text-emerald-900 mt-0.5">
+                {sortedList[0].totalVerses.toLocaleString('id-ID')} Ayat Dibaca (~{sortedList[0].estimatedJuz} Juz)
+              </div>
+              <div className="text-[11px] text-amber-900 font-medium truncate mt-0.5">
+                {sortedList[0].lastPosition !== '-' ? sortedList[0].lastPosition : `${sortedList[0].tilawahCount} Laporan`} • {sortedList[0].totalSholawat.toLocaleString('id-ID')} Sholawat
               </div>
             </div>
           </div>
@@ -338,7 +364,7 @@ export const MemberLeaderboard: React.FC<MemberLeaderboardProps> = ({
             onClick={() => onSelectMember && onSelectMember(sortedList[2].name)}
             className="order-3 bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex items-center gap-3 cursor-pointer hover:border-slate-300 transition-all"
           >
-            <div className="w-10 h-10 rounded-full bg-orange-50 text-orange-800 flex items-center justify-center font-black text-lg border-2 border-orange-200 shrink-0">
+            <div className="w-11 h-11 rounded-full bg-orange-50 text-orange-800 flex items-center justify-center font-black text-xl border-2 border-orange-200 shrink-0">
               🥉
             </div>
             <div className="flex-1 min-w-0">
@@ -346,10 +372,11 @@ export const MemberLeaderboard: React.FC<MemberLeaderboardProps> = ({
                 {rankScope === 'monthly' ? 'Peringkat 3 Bulan Ini' : 'Peringkat 3 Global'}
               </span>
               <div className="font-bold text-slate-900 text-sm truncate">{sortedList[2].name}</div>
-              <div className="text-xs text-slate-600 mt-0.5 font-medium">
-                {sortBy === 'tilawah'
-                  ? `${sortedList[2].tilawahCount} Laporan`
-                  : `${sortedList[2].totalSholawat.toLocaleString('id-ID')} Sholawat`}
+              <div className="text-xs text-emerald-800 font-bold mt-0.5">
+                {sortedList[2].totalVerses.toLocaleString('id-ID')} Ayat (~{sortedList[2].estimatedJuz} Juz)
+              </div>
+              <div className="text-[11px] text-slate-500 truncate mt-0.5">
+                {sortedList[2].lastPosition !== '-' ? sortedList[2].lastPosition : `${sortedList[2].tilawahCount} Lap.`} • {sortedList[2].totalSholawat.toLocaleString('id-ID')} Sholawat
               </div>
             </div>
           </div>
@@ -368,9 +395,11 @@ export const MemberLeaderboard: React.FC<MemberLeaderboardProps> = ({
         {sortedList.map((member, idx) => {
           const rank = idx + 1;
           const pct =
-            sortBy === 'tilawah'
-              ? Math.round((member.tilawahCount / maxTilawah) * 100)
-              : Math.round((member.totalSholawat / maxSholawat) * 100);
+            sortBy === 'verses'
+              ? Math.round((member.totalVerses / maxVerses) * 100)
+              : sortBy === 'sholawat'
+              ? Math.round((member.totalSholawat / maxSholawat) * 100)
+              : Math.round((member.tilawahCount / maxReports) * 100);
 
           return (
             <div
@@ -381,7 +410,7 @@ export const MemberLeaderboard: React.FC<MemberLeaderboardProps> = ({
             >
               {/* Rank number badge */}
               <div
-                className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-extrabold shrink-0 ${
+                className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-extrabold shrink-0 ${
                   rank === 1
                     ? 'bg-amber-100 text-amber-800 ring-2 ring-amber-300'
                     : rank === 2
@@ -396,35 +425,62 @@ export const MemberLeaderboard: React.FC<MemberLeaderboardProps> = ({
 
               {/* Member details & progress */}
               <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="font-bold text-slate-900 text-sm truncate">
-                    {member.name}
-                  </span>
-                  <div className="flex items-center gap-4 text-xs">
-                    <span className="text-slate-600 inline-flex items-center gap-1">
-                      <BookOpen className="w-3.5 h-3.5 text-emerald-600" />
-                      <strong>{member.tilawahCount}</strong> lap.
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 mb-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-slate-900 text-sm truncate">
+                      {member.name}
                     </span>
-                    <span className="text-amber-800 font-semibold inline-flex items-center gap-1">
+                    {member.lastPosition && member.lastPosition !== '-' && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200/80 text-[10px] font-semibold">
+                        <BookmarkCheck className="w-3 h-3" />
+                        {member.lastPosition}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Metrics Badges */}
+                  <div className="flex items-center gap-3 text-xs shrink-0">
+                    <span className="inline-flex items-center gap-1 font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/60">
+                      <BookOpen className="w-3.5 h-3.5 text-emerald-600" />
+                      <strong>{member.totalVerses.toLocaleString('id-ID')}</strong> Ayat
+                      <span className="text-[10px] font-normal text-emerald-600">
+                        (~{member.estimatedJuz} Juz)
+                      </span>
+                    </span>
+
+                    <span className="text-amber-800 font-semibold inline-flex items-center gap-1 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200/60">
                       <HeartHandshake className="w-3.5 h-3.5 text-amber-600" />
                       <strong>{member.totalSholawat.toLocaleString('id-ID')}</strong>
+                    </span>
+
+                    <span className="text-slate-500 hidden md:inline-flex items-center gap-1 text-[11px]">
+                      {member.tilawahCount} laporan
                     </span>
                   </div>
                 </div>
 
                 {/* Progress bar */}
-                <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden mt-1.5">
                   <div
                     className={`h-full rounded-full transition-all duration-500 ${
-                      sortBy === 'tilawah' ? 'bg-emerald-600' : 'bg-amber-500'
+                      sortBy === 'verses'
+                        ? 'bg-emerald-600'
+                        : sortBy === 'sholawat'
+                        ? 'bg-amber-500'
+                        : 'bg-slate-600'
                     }`}
                     style={{ width: `${pct}%` }}
                   />
                 </div>
 
-                <span className="text-[10px] text-slate-400 mt-1 block">
-                  Aktivitas terakhir: {member.lastActive}
-                </span>
+                <div className="flex items-center justify-between text-[10px] text-slate-400 mt-1">
+                  <span>
+                    Aktivitas terakhir: {member.lastActive}
+                  </span>
+                  <span className="hidden sm:inline">
+                    Estimasi: ~{member.estimatedPages} halaman mushaf
+                  </span>
+                </div>
               </div>
             </div>
           );

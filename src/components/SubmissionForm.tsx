@@ -19,6 +19,7 @@ import {
   SHOLAWAT_PRESETS,
   KEGIATAN_OPTIONS,
 } from '../data/quranData';
+import { findSurah } from '../data/quranSurahData';
 import type { SubmissionData, SheetRow } from '../types';
 import { ConfirmationModal } from './ConfirmationModal';
 
@@ -382,11 +383,21 @@ export const SubmissionForm: React.FC<SubmissionFormProps> = ({
 
             {/* Ayat */}
             <div className="space-y-2">
-              <label className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
-                <span>4. Nomor Ayat</span>
-              </label>
+              <div className="flex items-center justify-between">
+                <label htmlFor="input-ayat" className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+                  <span>4. Nomor / Rentang Ayat</span>
+                </label>
+                {(() => {
+                  const sInfo = findSurah(surat);
+                  return sInfo ? (
+                    <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                      Total: {sInfo.totalAyat} ayat
+                    </span>
+                  ) : null;
+                })()}
+              </div>
               <p className="text-[11px] text-slate-500">
-                Nomor ayat terakhir yang dibaca (cth: 0, 1-10, 25, 141)
+                Ketik nomor ayat terakhir (cth: <span className="font-semibold text-slate-700">100</span>) atau rentang (cth: <span className="font-semibold text-slate-700">1-3</span>). Selisih bacaan dihitung otomatis ke peringkat.
               </p>
               <input
                 id="input-ayat"

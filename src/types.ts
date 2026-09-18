@@ -22,14 +22,27 @@ export interface SheetRow {
   rawDate: Date;
 }
 
+export interface MemberContribution {
+  name: string;
+  totalVerses: number;
+  estimatedJuz: number;
+  estimatedPages: number;
+  lastPosition?: string;
+  tilawahCount: number;
+  totalSholawat: number;
+  lastActive: string;
+}
+
 export interface DashboardMetrics {
   totalSubmissions: number;
   totalSholawat: number;
   totalUniqueMembers: number;
+  totalVersesRead: number;
+  estimatedTotalJuz: number;
   topSurah: { name: string; count: number };
   todaySubmissions: number;
   kegiatanCounts: Record<string, number>;
-  memberContributions: { name: string; tilawahCount: number; totalSholawat: number; lastActive: string }[];
+  memberContributions: MemberContribution[];
   dailyTrends: { date: string; displayDate: string; count: number; sholawat: number }[];
   surahRankings: { surah: string; count: number }[];
 }
