@@ -173,7 +173,7 @@ export default function App() {
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8">
         {/* Tab 1: Formulir Setoran */}
         {activeTab === 'form' && (
-          <div className="space-y-6">
+          <div className="max-w-3xl mx-auto space-y-6">
             <SubmissionForm
               onSubmit={handleFormSubmit}
               isSubmitting={isSubmitting}

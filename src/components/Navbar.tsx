@@ -170,7 +170,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
             }`}
           >
-            Peringkat &amp; Leaderboard
+            Papan Peringkat (Leaderboard)
           </button>
           <button
             id="tab-btn-stats"
